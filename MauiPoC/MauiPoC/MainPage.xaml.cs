@@ -2,15 +2,22 @@
 {
     public partial class MainPage : ContentPage
     {
+        IConnectivity _connectivity;
+        IGeolocation _geolocation;
         private readonly LocalDbService _dbService;
         private int _editCustomerId;
         public string ExampleValue { get; set; } = "TEST";
 
 
-        public MainPage(LocalDbService dbService)
+        public MainPage(LocalDbService dbService,
+                        IConnectivity connectivity,
+                        IGeolocation geolocation
+                        )
         {
             InitializeComponent();
             _dbService = dbService;
+            _connectivity = connectivity;
+            _geolocation = geolocation;
             LoadCustomers();
         }
 
@@ -23,8 +30,34 @@
             });
         }
 
+        private async Task<double> GetClosestThing()
+        {
+            var location = await _geolocation.GetLocationAsync();
+
+            if (location == null)
+            {
+                location = await _geolocation.GetLocationAsync(new GeolocationRequest
+                {
+                    DesiredAccuracy = GeolocationAccuracy.Medium,
+                    Timeout = TimeSpan.FromSeconds(30)
+                });
+            }
+
+            var howFar = location.CalculateDistance(new Location(-22.4269, -45.4530), DistanceUnits.Kilometers);
+
+            return (double)howFar;
+        }
+
         private async void saveButton_Clicked(object sender, EventArgs e)
         {
+            var howFar = await GetClosestThing();
+
+            if (_connectivity.NetworkAccess != NetworkAccess.Internet)
+            {
+                await Shell.Current.DisplayAlert("Uh oh", "No Intetnet", "OK");
+                return;
+            }
+
             if (_editCustomerId == 0)
             {
                 // Add customer
